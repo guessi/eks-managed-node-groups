@@ -96,8 +96,8 @@ func nodegroupSizeForm() (int32, int32, int32) {
 	return utils.ParseInt32(desiredSize), utils.ParseInt32(minSize), utils.ParseInt32(maxSize)
 }
 
-func Entry() error {
-	client := eksclient.GetEksClient()
+func Entry(region string) error {
+	client := eksclient.GetEksClient(region)
 
 	clusters := eksclient.ListClusters(client)
 	if len(clusters) == 0 {

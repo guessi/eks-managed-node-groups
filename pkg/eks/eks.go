@@ -11,9 +11,10 @@ import (
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
 )
 
-func GetEksClient() *eks.Client {
+func GetEksClient(region string) *eks.Client {
 	cfg, err := config.LoadDefaultConfig(
 		context.Background(),
+		config.WithRegion(region),
 	)
 	if err != nil {
 		log.Fatalf("unable to load AWS SDK config, %v", err)

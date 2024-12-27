@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
@@ -14,8 +13,17 @@ func main() {
 		Name:    constants.AppName,
 		Usage:   constants.AppUsage,
 		Version: constants.VersionString,
-		Action: func(*cli.Context) error {
-			if err := ui.Entry(); err != nil {
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "region",
+				Aliases: []string{"r"},
+				Value:   "us-east-1",
+				Usage:   "Region for the clusters",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			region := c.String("region")
+			if err := ui.Entry(region); err != nil {
 				return err
 			}
 			return nil
@@ -34,6 +42,6 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		return
 	}
 }
