@@ -43,24 +43,14 @@ func ListNodegroups(client *eks.Client, cluster string) []string {
 	return result.Nodegroups
 }
 
-func GetNodegroupScalingConfig(client *eks.Client, clusterName, nodegroupName string) (int32, int32, int32) {
+func GetNodegroupScalingConfig(client *eks.Client, clusterName, nodegroupName string) *types.NodegroupScalingConfig {
 	result, err := client.DescribeNodegroup(context.Background(), &eks.DescribeNodegroupInput{ClusterName: &clusterName, NodegroupName: &nodegroupName})
 	if err != nil {
 		log.Fatal(err)
 	}
-	return *result.Nodegroup.ScalingConfig.DesiredSize, *result.Nodegroup.ScalingConfig.MinSize, *result.Nodegroup.ScalingConfig.MaxSize
+	return result.Nodegroup.ScalingConfig
 }
 
-func UpdateNodegroupConfig(client *eks.Client, clusterName, nodegroupName string, desired, min, max int32) (*eks.UpdateNodegroupConfigOutput, error) {
-	scalingConfig := types.NodegroupScalingConfig{
-		DesiredSize: &desired,
-		MinSize:     &min,
-		MaxSize:     &max,
-	}
-	updateNodegroupConfigInput := eks.UpdateNodegroupConfigInput{
-		ClusterName:   &clusterName,
-		NodegroupName: &nodegroupName,
-		ScalingConfig: &scalingConfig,
-	}
+func UpdateNodegroupConfig(client *eks.Client, updateNodegroupConfigInput eks.UpdateNodegroupConfigInput) (*eks.UpdateNodegroupConfigOutput, error) {
 	return client.UpdateNodegroupConfig(context.Background(), &updateNodegroupConfigInput)
 }

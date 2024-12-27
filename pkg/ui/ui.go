@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/eks"
+	"github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/charmbracelet/huh"
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
 	eksclient "github.com/guessi/eks-managed-node-groups/pkg/eks"
@@ -15,7 +17,7 @@ import (
 func ShowVersion() {
 	r, _ := regexp.Compile(`v[0-9]\.[0-9]+\.[0-9]+`)
 	versionInfo := r.FindString(constants.GitVersion)
-	fmt.Println("eks-managed-node-groups", versionInfo)
+	fmt.Println(constants.AppName, versionInfo)
 	fmt.Println(" Git Commit:", constants.GitVersion)
 	fmt.Println(" Build with:", constants.GoVersion)
 	fmt.Println(" Build time:", constants.BuildTime)
@@ -99,33 +101,42 @@ func Entry() error {
 
 	clusters := eksclient.ListClusters(client)
 	if len(clusters) == 0 {
-		fmt.Println("No cluster found.")
+		fmt.Println("no cluster found")
 		return nil
 	}
 	clusterName := clustersForm(clusters)
 
 	nodegroups := eksclient.ListNodegroups(client, clusterName)
 	if len(nodegroups) == 0 {
-		fmt.Println("No nodegroups found.")
+		fmt.Println("no nodegroup found")
 		return nil
 	}
 	nodegroupName := nodegroupsForm(nodegroups)
 
 	desiredSize, minSize, maxSize := nodegroupSizeForm()
-
-	currentDesireSize, currentMinSize, currentMaxSize := eksclient.GetNodegroupScalingConfig(client, clusterName, nodegroupName)
-
-	if isValid := utils.ValidateNodegroupSize(desiredSize, minSize, maxSize); isValid {
-		if currentDesireSize == desiredSize && currentMinSize == minSize && currentMaxSize == maxSize {
-			fmt.Println("No change required, target node group size have no difference.")
-			return nil
-		}
-		result, err := eksclient.UpdateNodegroupConfig(client, clusterName, nodegroupName, desiredSize, minSize, maxSize)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Request details: {desiredSize: %d, minSize: %d, maxSize: %d}\n", desiredSize, minSize, maxSize)
-		fmt.Printf("Request sent at: %s\n", result.Update.CreatedAt.Format(time.RFC3339))
+	if err := utils.ValidateNodegroupSize(desiredSize, minSize, maxSize); err != nil {
+		return err
 	}
+
+	sc := eksclient.GetNodegroupScalingConfig(client, clusterName, nodegroupName)
+	if *sc.DesiredSize == desiredSize && *sc.MinSize == minSize && *sc.MaxSize == maxSize {
+		fmt.Println("no change required, target node group size have no difference")
+		return nil
+	}
+
+	updateNodegroupConfigInput := eks.UpdateNodegroupConfigInput{
+		ClusterName:   &clusterName,
+		NodegroupName: &nodegroupName,
+		ScalingConfig: &types.NodegroupScalingConfig{DesiredSize: &desiredSize, MinSize: &minSize, MaxSize: &maxSize},
+	}
+
+	result, err := eksclient.UpdateNodegroupConfig(client, updateNodegroupConfigInput)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Request details: {desiredSize: %d, minSize: %d, maxSize: %d}\n", desiredSize, minSize, maxSize)
+	fmt.Printf("Request sent at: %s\n", result.Update.CreatedAt.Format(time.RFC3339))
+
 	return nil
 }

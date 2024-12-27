@@ -28,23 +28,18 @@ func ParseInt32(input string) int32 {
 	return int32(value)
 }
 
-func ValidateNodegroupSize(desiredSize, minSize, maxSize int32) bool {
+func ValidateNodegroupSize(desiredSize, minSize, maxSize int32) error {
 	switch {
 	case desiredSize < 0:
-		fmt.Println("Requested desired capacity can't be less than 0.")
-		return false
+		return errors.New("requested desired capacity can't be less than 0")
 	case minSize < 0:
-		fmt.Println("Requested min capacity can't be less than 0.")
-		return false
+		return errors.New("requested min capacity can't be less than 0")
 	case maxSize < 1:
-		fmt.Println("Requested max capacity can't be less than 1.")
-		return false
+		return errors.New("requested max capacity can't be less than 1")
 	case minSize > desiredSize:
-		fmt.Printf("Minimum capacity %d can't be greater than desired size %d.\n", minSize, desiredSize)
-		return false
+		return fmt.Errorf("minimum capacity %d can't be greater than desired size %d", minSize, desiredSize)
 	case minSize > maxSize:
-		fmt.Printf("Minimum capacity %d can't be greater than max size %d.\n", minSize, maxSize)
-		return false
+		return fmt.Errorf("minimum capacity %d can't be greater than max size %d", minSize, maxSize)
 	}
-	return true
+	return nil
 }
