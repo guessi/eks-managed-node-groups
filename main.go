@@ -13,7 +13,7 @@ func main() {
 	app := &cli.App{
 		Name:    constants.AppName,
 		Usage:   constants.AppUsage,
-		Version: constants.VersionString,
+		Version: constants.GitVersion,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "region",

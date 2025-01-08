@@ -26,7 +26,7 @@ func GetAsgClient(region string) *autoscaling.Client {
 	return autoscaling.NewFromConfig(cfg, func(options *autoscaling.Options) {
 		options.APIOptions = append(
 			options.APIOptions,
-			middleware.AddUserAgentKeyValue(constants.AppName, constants.VersionString),
+			middleware.AddUserAgentKeyValue(constants.AppName, constants.GitVersion),
 		)
 	})
 }

@@ -23,7 +23,7 @@ func GetEksClient(region string) *eks.Client {
 	return eks.NewFromConfig(cfg, func(options *eks.Options) {
 		options.APIOptions = append(
 			options.APIOptions,
-			middleware.AddUserAgentKeyValue(constants.AppName, constants.VersionString),
+			middleware.AddUserAgentKeyValue(constants.AppName, constants.GitVersion),
 		)
 	})
 }
