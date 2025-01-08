@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/charmbracelet/huh"
+	asgwrapper "github.com/guessi/eks-managed-node-groups/pkg/asg"
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
-	eksclient "github.com/guessi/eks-managed-node-groups/pkg/eks"
+	ekswrapper "github.com/guessi/eks-managed-node-groups/pkg/eks"
 	"github.com/guessi/eks-managed-node-groups/pkg/utils"
 )
 
@@ -41,6 +44,34 @@ func clustersForm(clusters []string) string {
 	}
 
 	return clusterName
+}
+
+func nodeGroupTypeForm() string {
+	var targetType string
+	targetTypeForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("What kind of node group it is about?").
+				Options(
+					huh.NewOption(
+						constants.NodeGroupTypes[constants.Managed],
+						constants.NodeGroupTypes[constants.Managed],
+					),
+					huh.NewOption(
+						constants.NodeGroupTypes[constants.SelfManaged],
+						constants.NodeGroupTypes[constants.SelfManaged],
+					),
+				).
+				Value(&targetType).
+				Height(10),
+		),
+	)
+	err := targetTypeForm.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return targetType
 }
 
 func nodegroupsForm(nodegroups []string) string {
@@ -96,17 +127,85 @@ func nodegroupSizeForm() (int32, int32, int32) {
 	return utils.ParseInt32(desiredSize), utils.ParseInt32(minSize), utils.ParseInt32(maxSize)
 }
 
-func Entry(region string) error {
-	client := eksclient.GetEksClient(region)
+func nodegroupDesiredCapacityForm() int32 {
+	var desiredCapacity string
 
-	clusters := eksclient.ListClusters(client)
-	if len(clusters) == 0 {
-		fmt.Println("no cluster found")
+	nodegroupDesiredCapacityForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Desired capacity").
+				Description("Desired capacity of node group?").
+				Value(&desiredCapacity).
+				Validate(utils.IsInteger).
+				CharLimit(3),
+		),
+	)
+	err := nodegroupDesiredCapacityForm.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return utils.ParseInt32(desiredCapacity)
+}
+
+func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName string) error {
+	nodegroups := asgwrapper.GetAutoScalingGroupsByClusterName(asgClient, clusterName)
+	if len(nodegroups) == 0 {
+		fmt.Println("no nodegroup found")
 		return nil
 	}
-	clusterName := clustersForm(clusters)
+	nodegroupName := nodegroupsForm(nodegroups)
 
-	nodegroups := eksclient.ListNodegroups(client, clusterName)
+	desiredCapacity := nodegroupDesiredCapacityForm()
+
+	if err := utils.ValidateDesiredCapacity(desiredCapacity); err != nil {
+		return err
+	}
+
+	describeAutoScalingGroupsOutput, err := asgwrapper.DescribeAutoScalingGroupsByNodegroupName(asgClient, nodegroupName)
+	if err != nil {
+		return err
+	}
+
+	var currentDesiredCapacity, currentMinSize, currentMaxSize int32
+	for _, group := range describeAutoScalingGroupsOutput.AutoScalingGroups {
+		if strings.Compare(*group.AutoScalingGroupName, nodegroupName) == 0 {
+			currentDesiredCapacity = *group.DesiredCapacity
+			currentMinSize = *group.MinSize
+			currentMaxSize = *group.MaxSize
+		}
+	}
+
+	if desiredCapacity < currentMinSize {
+		return fmt.Errorf("desired capacity is lower than target node group's min size, current state: {desired: %d, min: %d, max: %d}", currentDesiredCapacity, currentMinSize, currentMaxSize)
+	}
+
+	if desiredCapacity < currentMaxSize {
+		return fmt.Errorf("desired capacity is larger than target node group's max size, current state: {desired: %d, min: %d, max: %d}", currentDesiredCapacity, currentMinSize, currentMaxSize)
+	}
+
+	if currentDesiredCapacity == desiredCapacity {
+		fmt.Println("no change required, target node group size have no difference")
+		return nil
+	}
+
+	setDesiredCapacityInput := autoscaling.SetDesiredCapacityInput{
+		AutoScalingGroupName: &nodegroupName,
+		DesiredCapacity:      &desiredCapacity,
+	}
+
+	_, err = asgwrapper.SetDesiredCapacity(asgClient, setDesiredCapacityInput)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Request details: {desiredCapacity: %d}\n", desiredCapacity)
+
+	return nil
+}
+
+func managedNodeGroupWorkflow(eksClient *eks.Client, clusterName string) error {
+	nodegroups := ekswrapper.ListNodegroups(eksClient, clusterName)
 	if len(nodegroups) == 0 {
 		fmt.Println("no nodegroup found")
 		return nil
@@ -118,8 +217,11 @@ func Entry(region string) error {
 		return err
 	}
 
-	sc := eksclient.GetNodegroupScalingConfig(client, clusterName, nodegroupName)
-	if *sc.DesiredSize == desiredSize && *sc.MinSize == minSize && *sc.MaxSize == maxSize {
+	scalingConfig, err := ekswrapper.GetNodegroupScalingConfig(eksClient, clusterName, nodegroupName)
+	if err != nil {
+		return err
+	}
+	if *scalingConfig.DesiredSize == desiredSize && *scalingConfig.MinSize == minSize && *scalingConfig.MaxSize == maxSize {
 		fmt.Println("no change required, target node group size have no difference")
 		return nil
 	}
@@ -130,7 +232,7 @@ func Entry(region string) error {
 		ScalingConfig: &types.NodegroupScalingConfig{DesiredSize: &desiredSize, MinSize: &minSize, MaxSize: &maxSize},
 	}
 
-	result, err := eksclient.UpdateNodegroupConfig(client, updateNodegroupConfigInput)
+	result, err := ekswrapper.UpdateNodegroupConfig(eksClient, updateNodegroupConfigInput)
 	if err != nil {
 		return err
 	}
@@ -138,5 +240,31 @@ func Entry(region string) error {
 	fmt.Printf("Request details: {desiredSize: %d, minSize: %d, maxSize: %d}\n", desiredSize, minSize, maxSize)
 	fmt.Printf("Request sent at: %s\n", result.Update.CreatedAt.Format(time.RFC3339))
 
+	return nil
+}
+
+func Entry(region string) error {
+	eksClient := ekswrapper.GetEksClient(region)
+
+	clusters := ekswrapper.ListClusters(eksClient)
+	if len(clusters) == 0 {
+		fmt.Println("no cluster found")
+		return nil
+	}
+	clusterName := clustersForm(clusters)
+
+	nodeGroupType := nodeGroupTypeForm()
+
+	if nodeGroupType == constants.NodeGroupTypes[constants.SelfManaged] {
+		asgClient := asgwrapper.GetAsgClient(region)
+
+		if err := selfManagedNodeGroupWorkflow(asgClient, clusterName); err != nil {
+			return err
+		}
+	} else {
+		if err := managedNodeGroupWorkflow(eksClient, clusterName); err != nil {
+			return err
+		}
+	}
 	return nil
 }

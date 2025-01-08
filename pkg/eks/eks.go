@@ -44,12 +44,12 @@ func ListNodegroups(client *eks.Client, cluster string) []string {
 	return result.Nodegroups
 }
 
-func GetNodegroupScalingConfig(client *eks.Client, clusterName, nodegroupName string) *types.NodegroupScalingConfig {
+func GetNodegroupScalingConfig(client *eks.Client, clusterName, nodegroupName string) (*types.NodegroupScalingConfig, error) {
 	result, err := client.DescribeNodegroup(context.Background(), &eks.DescribeNodegroupInput{ClusterName: &clusterName, NodegroupName: &nodegroupName})
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return result.Nodegroup.ScalingConfig
+	return result.Nodegroup.ScalingConfig, nil
 }
 
 func UpdateNodegroupConfig(client *eks.Client, updateNodegroupConfigInput eks.UpdateNodegroupConfigInput) (*eks.UpdateNodegroupConfigOutput, error) {
