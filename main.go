@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
@@ -42,6 +43,7 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
+		fmt.Println(err.Error())
 		return
 	}
 }
