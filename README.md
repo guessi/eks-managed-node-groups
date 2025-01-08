@@ -8,30 +8,10 @@
 
 ## Usage
 
-```bash
-$ eks-managed-node-groups --help
-
-NAME:
-   eks-managed-node-groups - managed Amazon EKS node groups made easy
-
-USAGE:
-   eks-managed-node-groups [global options] command [command options]
-
-VERSION:
-   v1.0.0
-
-COMMANDS:
-   version, v  Print version number
-   help, h     Shows a list of commands or help for one command
-
-GLOBAL OPTIONS:
-   --help, -h     show help
-   --version, -v  print the version
-```
-
-## Sample Output
-
-[![asciicast](https://asciinema.org/a/YaLICvOSkcIkxEqYRoAXjwP6l.svg)](https://asciinema.org/a/YaLICvOSkcIkxEqYRoAXjwP6l)
+![image](https://github.com/user-attachments/assets/f2ea8a99-44d6-4641-a937-a8ec7eb8ca4c)
+![image](https://github.com/user-attachments/assets/8e324eac-2f0a-4a42-a7a9-2e9140ac7ff6)
+![image](https://github.com/user-attachments/assets/2839e7f4-bba3-4273-99bd-54041f4c7451)
+![image](https://github.com/user-attachments/assets/9e3f2d12-c697-4f61-80f2-5b9468ac25a0)
 
 ## Install
 
