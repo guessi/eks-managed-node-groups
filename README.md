@@ -1,10 +1,10 @@
 # eks-managed-node-groups
 
-[![GitHub Actions](https://github.com/guessi/eks-managed-node-groups/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/guessi/eks-managed-node-groups/actions/workflows/go.yml)
+[![GitHub Actions](https://github.com/guessi/eks-managed-node-groups/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/guessi/eks-managed-node-groups/actions/workflows/go.yml)
 [![GoDoc](https://godoc.org/github.com/guessi/eks-managed-node-groups?status.svg)](https://godoc.org/github.com/guessi/eks-managed-node-groups)
 [![Go Report Card](https://goreportcard.com/badge/github.com/guessi/eks-managed-node-groups)](https://goreportcard.com/report/github.com/guessi/eks-managed-node-groups)
 [![GitHub release](https://img.shields.io/github/release/guessi/eks-managed-node-groups.svg)](https://github.com/guessi/eks-managed-node-groups/releases/latest)
-[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/guessi/eks-managed-node-groups)](https://github.com/guessi/eks-managed-node-groups/blob/master/go.mod)
+[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/guessi/eks-managed-node-groups)](https://github.com/guessi/eks-managed-node-groups/blob/main/go.mod)
 
 ## Usage
 
