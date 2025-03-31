@@ -237,7 +237,7 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, clusterName string) error {
 		return err
 	}
 
-	fmt.Printf("Request details: {desiredSize: %d, minSize: %d, maxSize: %d}\n", desiredSize, minSize, maxSize)
+	fmt.Printf("Request details: {clusterName: %s, nodegroupName: %s, desiredSize: %d, minSize: %d, maxSize: %d}\n", clusterName, nodegroupName, desiredSize, minSize, maxSize)
 	fmt.Printf("Request sent at: %s\n", result.Update.CreatedAt.Format(time.RFC3339))
 
 	return nil
