@@ -1,5 +1,11 @@
 <!-- markdownlint-disable -->
 
+# v1.0.6 / 2025-03-31
+
+* More details after request completed
+* Bump dependencies
+* Change default branch
+
 # v1.0.5 / 2025-01-09
 
 * Support self-managed node groups discovery
