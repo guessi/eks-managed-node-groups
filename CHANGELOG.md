@@ -1,5 +1,10 @@
 <!-- markdownlint-disable -->
 
+# v1.0.7 / 2025-04-04
+
+* Build with go1.24.2
+* Bump dependencies
+
 # v1.0.6 / 2025-03-31
 
 * More details after request completed
