@@ -1,5 +1,10 @@
 <!-- markdownlint-disable -->
 
+# v1.0.8 / 2025-05-07
+
+* Ability to set Desire/Min/Max for Self-managed node groups
+* Bump dependencies
+
 # v1.0.7 / 2025-04-04
 
 * Build with go1.24.2
