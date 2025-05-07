@@ -127,27 +127,6 @@ func nodegroupSizeForm() (int32, int32, int32) {
 	return utils.ParseInt32(desiredSize), utils.ParseInt32(minSize), utils.ParseInt32(maxSize)
 }
 
-func nodegroupDesiredCapacityForm() int32 {
-	var desiredCapacity string
-
-	nodegroupDesiredCapacityForm := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Desired capacity").
-				Description("Desired capacity of node group?").
-				Value(&desiredCapacity).
-				Validate(utils.IsInteger).
-				CharLimit(3),
-		),
-	)
-	err := nodegroupDesiredCapacityForm.Run()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return utils.ParseInt32(desiredCapacity)
-}
-
 func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName string) error {
 	nodegroups := asgwrapper.GetAutoScalingGroupsByClusterName(asgClient, clusterName)
 	if len(nodegroups) == 0 {
@@ -156,9 +135,8 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName str
 	}
 	nodegroupName := nodegroupsForm(nodegroups)
 
-	desiredCapacity := nodegroupDesiredCapacityForm()
-
-	if err := utils.ValidateDesiredCapacity(desiredCapacity); err != nil {
+	desiredSize, minSize, maxSize := nodegroupSizeForm()
+	if err := utils.ValidateNodegroupSize(desiredSize, minSize, maxSize); err != nil {
 		return err
 	}
 
@@ -176,30 +154,25 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName str
 		}
 	}
 
-	if desiredCapacity < currentMinSize {
-		return fmt.Errorf("desired capacity is lower than target node group's min size, current state: {desired: %d, min: %d, max: %d}", currentDesiredCapacity, currentMinSize, currentMaxSize)
-	}
-
-	if desiredCapacity < currentMaxSize {
-		return fmt.Errorf("desired capacity is larger than target node group's max size, current state: {desired: %d, min: %d, max: %d}", currentDesiredCapacity, currentMinSize, currentMaxSize)
-	}
-
-	if currentDesiredCapacity == desiredCapacity {
+	if currentDesiredCapacity == desiredSize && currentMinSize == minSize && currentMaxSize == maxSize {
 		fmt.Println("no change required, target node group size have no difference")
 		return nil
 	}
 
-	setDesiredCapacityInput := autoscaling.SetDesiredCapacityInput{
+	updateAutoScalingGroupInput := autoscaling.UpdateAutoScalingGroupInput{
 		AutoScalingGroupName: &nodegroupName,
-		DesiredCapacity:      &desiredCapacity,
+		DesiredCapacity:      &desiredSize,
+		MinSize:              &minSize,
+		MaxSize:              &maxSize,
 	}
 
-	_, err = asgwrapper.SetDesiredCapacity(asgClient, setDesiredCapacityInput)
+	_, err = asgwrapper.UpdateAutoScalingGroup(asgClient, updateAutoScalingGroupInput)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Request details: {desiredCapacity: %d}\n", desiredCapacity)
+	fmt.Printf("Request details: {clusterName: %s, nodegroupName: %s, desiredSize: %d, minSize: %d, maxSize: %d}\n", clusterName, nodegroupName, desiredSize, minSize, maxSize)
+	fmt.Printf("Request sent at: %s\n", time.Now().Format(time.RFC3339))
 
 	return nil
 }

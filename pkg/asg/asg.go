@@ -63,6 +63,6 @@ func DescribeAutoScalingGroupsByNodegroupName(client *autoscaling.Client, nodeGr
 	return client.DescribeAutoScalingGroups(context.Background(), &autoscaling.DescribeAutoScalingGroupsInput{AutoScalingGroupNames: []string{nodeGroupName}})
 }
 
-func SetDesiredCapacity(client *autoscaling.Client, setDesiredCapacityInput autoscaling.SetDesiredCapacityInput) (*autoscaling.SetDesiredCapacityOutput, error) {
-	return client.SetDesiredCapacity(context.Background(), &setDesiredCapacityInput)
+func UpdateAutoScalingGroup(client *autoscaling.Client, updateAutoScalingGroupInput autoscaling.UpdateAutoScalingGroupInput) (*autoscaling.UpdateAutoScalingGroupOutput, error) {
+	return client.UpdateAutoScalingGroup(context.Background(), &updateAutoScalingGroupInput)
 }

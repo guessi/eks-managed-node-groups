@@ -43,11 +43,3 @@ func ValidateNodegroupSize(desiredSize, minSize, maxSize int32) error {
 	}
 	return nil
 }
-
-func ValidateDesiredCapacity(desiredCapacity int32) error {
-	switch {
-	case desiredCapacity < 0:
-		return errors.New("requested desired capacity can't be less than 0")
-	}
-	return nil
-}
