@@ -1,16 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
 	"github.com/guessi/eks-managed-node-groups/pkg/ui"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func main() {
-	app := &cli.App{
+	app := &cli.Command{
 		Name:    constants.AppName,
 		Usage:   constants.AppUsage,
 		Version: constants.GitVersion,
@@ -22,7 +23,7 @@ func main() {
 				Usage:   "Region for the clusters",
 			},
 		},
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			region := c.String("region")
 			if err := ui.Entry(region); err != nil {
 				return err
@@ -34,7 +35,7 @@ func main() {
 				Name:    "version",
 				Aliases: []string{"v"},
 				Usage:   "Print version number",
-				Action: func(cCtx *cli.Context) error {
+				Action: func(context.Context, *cli.Command) error {
 					ui.ShowVersion()
 					return nil
 				},
@@ -42,7 +43,7 @@ func main() {
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	if err := app.Run(context.Background(), os.Args); err != nil {
 		fmt.Println(err.Error())
 		return
 	}
