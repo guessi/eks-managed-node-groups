@@ -1,5 +1,10 @@
 <!-- markdownlint-disable -->
 
+# v1.0.9 / 2025-05-22
+
+* Migrate to github.com/urfave/cli/v3
+* Bump dependencies
+
 # v1.0.8 / 2025-05-07
 
 * Ability to set Desire/Min/Max for Self-managed node groups
