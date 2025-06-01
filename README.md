@@ -33,8 +33,16 @@ In the real world, not all [Amazon EKS](https://docs.aws.amazon.com/eks/latest/u
 
 ### For macOS/Linux users (Recommended)
 
+Brand new install
+
 ```bash
 brew tap guessi/tap && brew update && brew install eks-managed-node-groups
+```
+
+To upgrade version
+
+```bash
+brew update && brew upgrade eks-managed-node-groups
 ```
 
 ### Manually setup (Linux, Windows, macOS)
