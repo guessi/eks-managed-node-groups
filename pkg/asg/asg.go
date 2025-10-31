@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/middleware"
@@ -15,8 +16,11 @@ import (
 )
 
 func GetAsgClient(region string) *autoscaling.Client {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	cfg, err := config.LoadDefaultConfig(
-		context.Background(),
+		ctx,
 		config.WithRegion(region),
 	)
 	if err != nil {
@@ -32,7 +36,10 @@ func GetAsgClient(region string) *autoscaling.Client {
 }
 
 func GetAutoScalingGroupsByClusterName(client *autoscaling.Client, clusterName string) []string {
-	result, err := client.DescribeAutoScalingGroups(context.Background(), &autoscaling.DescribeAutoScalingGroupsInput{
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := client.DescribeAutoScalingGroups(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
 		Filters: []types.Filter{
 			{
 				Name:   aws.String(fmt.Sprintf("tag:kubernetes.io/cluster/%s", clusterName)),
@@ -60,9 +67,15 @@ func GetAutoScalingGroupsByClusterName(client *autoscaling.Client, clusterName s
 }
 
 func DescribeAutoScalingGroupsByNodegroupName(client *autoscaling.Client, nodeGroupName string) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {
-	return client.DescribeAutoScalingGroups(context.Background(), &autoscaling.DescribeAutoScalingGroupsInput{AutoScalingGroupNames: []string{nodeGroupName}})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	return client.DescribeAutoScalingGroups(ctx, &autoscaling.DescribeAutoScalingGroupsInput{AutoScalingGroupNames: []string{nodeGroupName}})
 }
 
 func UpdateAutoScalingGroup(client *autoscaling.Client, updateAutoScalingGroupInput autoscaling.UpdateAutoScalingGroupInput) (*autoscaling.UpdateAutoScalingGroupOutput, error) {
-	return client.UpdateAutoScalingGroup(context.Background(), &updateAutoScalingGroupInput)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	return client.UpdateAutoScalingGroup(ctx, &updateAutoScalingGroupInput)
 }

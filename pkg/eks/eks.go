@@ -3,6 +3,7 @@ package eks
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -12,8 +13,11 @@ import (
 )
 
 func GetEksClient(region string) *eks.Client {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	cfg, err := config.LoadDefaultConfig(
-		context.Background(),
+		ctx,
 		config.WithRegion(region),
 	)
 	if err != nil {
@@ -29,7 +33,10 @@ func GetEksClient(region string) *eks.Client {
 }
 
 func ListClusters(client *eks.Client) []string {
-	result, err := client.ListClusters(context.Background(), &eks.ListClustersInput{})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := client.ListClusters(ctx, &eks.ListClustersInput{})
 	if err != nil {
 		log.Fatalf("unable to execute ListClusters, %v", err)
 	}
@@ -37,7 +44,10 @@ func ListClusters(client *eks.Client) []string {
 }
 
 func ListNodegroups(client *eks.Client, cluster string) []string {
-	result, err := client.ListNodegroups(context.Background(), &eks.ListNodegroupsInput{ClusterName: &cluster})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := client.ListNodegroups(ctx, &eks.ListNodegroupsInput{ClusterName: &cluster})
 	if err != nil {
 		log.Fatalf("unable to execute ListNodegroups, %v", err)
 	}
@@ -45,7 +55,10 @@ func ListNodegroups(client *eks.Client, cluster string) []string {
 }
 
 func GetNodegroupScalingConfig(client *eks.Client, clusterName, nodegroupName string) (*types.NodegroupScalingConfig, error) {
-	result, err := client.DescribeNodegroup(context.Background(), &eks.DescribeNodegroupInput{ClusterName: &clusterName, NodegroupName: &nodegroupName})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := client.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{ClusterName: &clusterName, NodegroupName: &nodegroupName})
 	if err != nil {
 		return nil, err
 	}
@@ -53,5 +66,8 @@ func GetNodegroupScalingConfig(client *eks.Client, clusterName, nodegroupName st
 }
 
 func UpdateNodegroupConfig(client *eks.Client, updateNodegroupConfigInput eks.UpdateNodegroupConfigInput) (*eks.UpdateNodegroupConfigOutput, error) {
-	return client.UpdateNodegroupConfig(context.Background(), &updateNodegroupConfigInput)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	return client.UpdateNodegroupConfig(ctx, &updateNodegroupConfigInput)
 }
