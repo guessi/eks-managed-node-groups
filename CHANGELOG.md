@@ -1,5 +1,9 @@
 <!-- markdownlint-disable -->
 
+# v1.2.0 / 2025-11-29
+
+* Context timeout support
+
 # v1.1.0 / 2025-09-10
 
 * Built with go1.25
