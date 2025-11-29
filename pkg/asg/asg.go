@@ -41,7 +41,7 @@ func GetAutoScalingGroupsByClusterName(client *autoscaling.Client, clusterName s
 		Filters: []types.Filter{
 			{
 				Name:   aws.String(fmt.Sprintf("tag:kubernetes.io/cluster/%s", clusterName)),
-				Values: []string{*aws.String("owned")},
+				Values: []string{"owned"},
 			},
 		}})
 	if err != nil {
