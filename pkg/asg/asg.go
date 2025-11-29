@@ -3,7 +3,6 @@ package asg
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
 )
 
-func GetAsgClient(region string) *autoscaling.Client {
+func GetAsgClient(region string) (*autoscaling.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -24,7 +23,7 @@ func GetAsgClient(region string) *autoscaling.Client {
 		config.WithRegion(region),
 	)
 	if err != nil {
-		log.Fatalf("unable to load AWS SDK config, %v", err)
+		return nil, fmt.Errorf("unable to load AWS SDK config: %w", err)
 	}
 
 	return autoscaling.NewFromConfig(cfg, func(options *autoscaling.Options) {
@@ -32,10 +31,10 @@ func GetAsgClient(region string) *autoscaling.Client {
 			options.APIOptions,
 			middleware.AddUserAgentKeyValue(constants.AppName, constants.GitVersion),
 		)
-	})
+	}), nil
 }
 
-func GetAutoScalingGroupsByClusterName(client *autoscaling.Client, clusterName string) []string {
+func GetAutoScalingGroupsByClusterName(client *autoscaling.Client, clusterName string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -47,7 +46,7 @@ func GetAutoScalingGroupsByClusterName(client *autoscaling.Client, clusterName s
 			},
 		}})
 	if err != nil {
-		log.Fatalf("unable to execute DescribeAutoScalingGroups, %v", err)
+		return nil, fmt.Errorf("unable to execute DescribeAutoScalingGroups: %w", err)
 	}
 
 	autoscalinggroups := []string{}
@@ -63,7 +62,7 @@ func GetAutoScalingGroupsByClusterName(client *autoscaling.Client, clusterName s
 			autoscalinggroups = append(autoscalinggroups, *group.AutoScalingGroupName)
 		}
 	}
-	return autoscalinggroups
+	return autoscalinggroups, nil
 }
 
 func DescribeAutoScalingGroupsByNodegroupName(client *autoscaling.Client, nodeGroupName string) (*autoscaling.DescribeAutoScalingGroupsOutput, error) {

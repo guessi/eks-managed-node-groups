@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -26,7 +25,7 @@ func ShowVersion() {
 	fmt.Println(" Build time:", constants.BuildTime)
 }
 
-func clustersForm(clusters []string) string {
+func clustersForm(clusters []string) (string, error) {
 	var clusterName string
 
 	clusterForm := huh.NewForm(
@@ -40,13 +39,13 @@ func clustersForm(clusters []string) string {
 	)
 	err := clusterForm.Run()
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("cluster form error: %w", err)
 	}
 
-	return clusterName
+	return clusterName, nil
 }
 
-func nodeGroupTypeForm() string {
+func nodeGroupTypeForm() (string, error) {
 	var targetType string
 	targetTypeForm := huh.NewForm(
 		huh.NewGroup(
@@ -68,13 +67,13 @@ func nodeGroupTypeForm() string {
 	)
 	err := targetTypeForm.Run()
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("node group type form error: %w", err)
 	}
 
-	return targetType
+	return targetType, nil
 }
 
-func nodegroupsForm(nodegroups []string) string {
+func nodegroupsForm(nodegroups []string) (string, error) {
 	var nodegroupName string
 
 	nodegroupForm := huh.NewForm(
@@ -88,16 +87,16 @@ func nodegroupsForm(nodegroups []string) string {
 	)
 	err := nodegroupForm.Run()
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("nodegroup form error: %w", err)
 	}
 
-	return nodegroupName
+	return nodegroupName, nil
 }
 
-func nodegroupSizeForm() (int32, int32, int32) {
+func nodegroupSizeForm() (int32, int32, int32, error) {
 	var desiredSize, minSize, maxSize string
 
-	nodegroupSizeForm := huh.NewForm(
+	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Desired size").
@@ -119,23 +118,35 @@ func nodegroupSizeForm() (int32, int32, int32) {
 				CharLimit(3),
 		),
 	)
-	err := nodegroupSizeForm.Run()
-	if err != nil {
-		log.Fatal(err)
+	if err := form.Run(); err != nil {
+		return 0, 0, 0, err
 	}
 
-	return utils.ParseInt32(desiredSize), utils.ParseInt32(minSize), utils.ParseInt32(maxSize)
+	desired, _ := utils.ParseInt32(desiredSize)
+	min, _ := utils.ParseInt32(minSize)
+	max, _ := utils.ParseInt32(maxSize)
+
+	return desired, min, max, nil
 }
 
 func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName string) error {
-	nodegroups := asgwrapper.GetAutoScalingGroupsByClusterName(asgClient, clusterName)
+	nodegroups, err := asgwrapper.GetAutoScalingGroupsByClusterName(asgClient, clusterName)
+	if err != nil {
+		return err
+	}
 	if len(nodegroups) == 0 {
 		fmt.Println("no nodegroup found")
 		return nil
 	}
-	nodegroupName := nodegroupsForm(nodegroups)
+	nodegroupName, err := nodegroupsForm(nodegroups)
+	if err != nil {
+		return err
+	}
 
-	desiredSize, minSize, maxSize := nodegroupSizeForm()
+	desiredSize, minSize, maxSize, err := nodegroupSizeForm()
+	if err != nil {
+		return err
+	}
 	if err := utils.ValidateNodegroupSize(desiredSize, minSize, maxSize); err != nil {
 		return err
 	}
@@ -178,14 +189,23 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName str
 }
 
 func managedNodeGroupWorkflow(eksClient *eks.Client, clusterName string) error {
-	nodegroups := ekswrapper.ListNodegroups(eksClient, clusterName)
+	nodegroups, err := ekswrapper.ListNodegroups(eksClient, clusterName)
+	if err != nil {
+		return err
+	}
 	if len(nodegroups) == 0 {
 		fmt.Println("no nodegroup found")
 		return nil
 	}
-	nodegroupName := nodegroupsForm(nodegroups)
+	nodegroupName, err := nodegroupsForm(nodegroups)
+	if err != nil {
+		return err
+	}
 
-	desiredSize, minSize, maxSize := nodegroupSizeForm()
+	desiredSize, minSize, maxSize, err := nodegroupSizeForm()
+	if err != nil {
+		return err
+	}
 	if err := utils.ValidateNodegroupSize(desiredSize, minSize, maxSize); err != nil {
 		return err
 	}
@@ -217,19 +237,34 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, clusterName string) error {
 }
 
 func Entry(region string) error {
-	eksClient := ekswrapper.GetEksClient(region)
+	eksClient, err := ekswrapper.GetEksClient(region)
+	if err != nil {
+		return err
+	}
 
-	clusters := ekswrapper.ListClusters(eksClient)
+	clusters, err := ekswrapper.ListClusters(eksClient)
+	if err != nil {
+		return err
+	}
 	if len(clusters) == 0 {
 		fmt.Println("no cluster found")
 		return nil
 	}
-	clusterName := clustersForm(clusters)
+	clusterName, err := clustersForm(clusters)
+	if err != nil {
+		return err
+	}
 
-	nodeGroupType := nodeGroupTypeForm()
+	nodeGroupType, err := nodeGroupTypeForm()
+	if err != nil {
+		return err
+	}
 
 	if nodeGroupType == constants.NodeGroupTypes[constants.SelfManaged] {
-		asgClient := asgwrapper.GetAsgClient(region)
+		asgClient, err := asgwrapper.GetAsgClient(region)
+		if err != nil {
+			return err
+		}
 
 		if err := selfManagedNodeGroupWorkflow(asgClient, clusterName); err != nil {
 			return err

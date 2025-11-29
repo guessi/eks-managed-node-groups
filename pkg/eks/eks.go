@@ -2,7 +2,7 @@ package eks
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws/middleware"
@@ -12,7 +12,7 @@ import (
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
 )
 
-func GetEksClient(region string) *eks.Client {
+func GetEksClient(region string) (*eks.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -21,7 +21,7 @@ func GetEksClient(region string) *eks.Client {
 		config.WithRegion(region),
 	)
 	if err != nil {
-		log.Fatalf("unable to load AWS SDK config, %v", err)
+		return nil, fmt.Errorf("unable to load AWS SDK config: %w", err)
 	}
 
 	return eks.NewFromConfig(cfg, func(options *eks.Options) {
@@ -29,29 +29,29 @@ func GetEksClient(region string) *eks.Client {
 			options.APIOptions,
 			middleware.AddUserAgentKeyValue(constants.AppName, constants.GitVersion),
 		)
-	})
+	}), nil
 }
 
-func ListClusters(client *eks.Client) []string {
+func ListClusters(client *eks.Client) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	result, err := client.ListClusters(ctx, &eks.ListClustersInput{})
 	if err != nil {
-		log.Fatalf("unable to execute ListClusters, %v", err)
+		return nil, fmt.Errorf("unable to execute ListClusters: %w", err)
 	}
-	return result.Clusters
+	return result.Clusters, nil
 }
 
-func ListNodegroups(client *eks.Client, cluster string) []string {
+func ListNodegroups(client *eks.Client, cluster string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	result, err := client.ListNodegroups(ctx, &eks.ListNodegroupsInput{ClusterName: &cluster})
 	if err != nil {
-		log.Fatalf("unable to execute ListNodegroups, %v", err)
+		return nil, fmt.Errorf("unable to execute ListNodegroups: %w", err)
 	}
-	return result.Nodegroups
+	return result.Nodegroups, nil
 }
 
 func GetNodegroupScalingConfig(client *eks.Client, clusterName, nodegroupName string) (*types.NodegroupScalingConfig, error) {

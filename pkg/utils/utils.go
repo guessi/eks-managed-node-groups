@@ -3,7 +3,6 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 )
 
@@ -15,17 +14,17 @@ func IsInteger(input string) error {
 	return nil
 }
 
-func ParseInt32(input string) int32 {
+func ParseInt32(input string) (int32, error) {
 	if input == "" {
-		return *new(int32)
+		return 0, nil
 	}
 
 	value, err := strconv.ParseInt(input, 10, 32)
 	if err != nil {
-		log.Fatal(err)
+		return 0, fmt.Errorf("failed to parse int32: %w", err)
 	}
 
-	return int32(value)
+	return int32(value), nil
 }
 
 func ValidateNodegroupSize(desiredSize, minSize, maxSize int32) error {
