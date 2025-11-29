@@ -3,7 +3,6 @@ package asg
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -53,7 +52,7 @@ func GetAutoScalingGroupsByClusterName(client *autoscaling.Client, clusterName s
 	for _, group := range result.AutoScalingGroups {
 		var isManagedNodeGroup bool
 		for _, tag := range group.Tags {
-			if strings.Compare("eks:cluster-name", *aws.String(*tag.Key)) == 0 && strings.Compare(clusterName, *aws.String(*tag.Value)) == 0 {
+			if *tag.Key == "eks:cluster-name" && *tag.Value == clusterName {
 				isManagedNodeGroup = true
 				break
 			}

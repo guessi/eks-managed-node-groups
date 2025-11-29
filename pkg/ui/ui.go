@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
@@ -158,7 +157,7 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName str
 
 	var currentDesiredCapacity, currentMinSize, currentMaxSize int32
 	for _, group := range describeAutoScalingGroupsOutput.AutoScalingGroups {
-		if strings.Compare(*group.AutoScalingGroupName, nodegroupName) == 0 {
+		if *group.AutoScalingGroupName == nodegroupName {
 			currentDesiredCapacity = *group.DesiredCapacity
 			currentMinSize = *group.MinSize
 			currentMaxSize = *group.MaxSize
