@@ -165,14 +165,14 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName str
 		return err
 	}
 
-	var currentDesiredCapacity, currentMinSize, currentMaxSize int32
-	for _, group := range describeAutoScalingGroupsOutput.AutoScalingGroups {
-		if *group.AutoScalingGroupName == nodegroupName {
-			currentDesiredCapacity = *group.DesiredCapacity
-			currentMinSize = *group.MinSize
-			currentMaxSize = *group.MaxSize
-		}
+	if len(describeAutoScalingGroupsOutput.AutoScalingGroups) == 0 {
+		return fmt.Errorf("auto scaling group %s not found", nodegroupName)
 	}
+
+	group := describeAutoScalingGroupsOutput.AutoScalingGroups[0]
+	currentDesiredCapacity := *group.DesiredCapacity
+	currentMinSize := *group.MinSize
+	currentMaxSize := *group.MaxSize
 
 	if currentDesiredCapacity == desiredSize && currentMinSize == minSize && currentMaxSize == maxSize {
 		fmt.Println("no change required, target node group size have no difference")
