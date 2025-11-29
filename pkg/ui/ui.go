@@ -24,6 +24,16 @@ func ShowVersion() {
 	fmt.Println(" Build time:", constants.BuildTime)
 }
 
+func printRequestDetails(clusterName, nodegroupName string, desiredSize, minSize, maxSize int32, sentAt time.Time) {
+	fmt.Println("Request details:")
+	fmt.Printf("  Cluster:      %s\n", clusterName)
+	fmt.Printf("  Node Group:   %s\n", nodegroupName)
+	fmt.Printf("  Desired Size: %d\n", desiredSize)
+	fmt.Printf("  Min Size:     %d\n", minSize)
+	fmt.Printf("  Max Size:     %d\n", maxSize)
+	fmt.Printf("  Sent At:      %s\n", sentAt.Format(time.RFC3339))
+}
+
 func clustersForm(clusters []string) (string, error) {
 	var clusterName string
 
@@ -181,9 +191,7 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName str
 		return err
 	}
 
-	fmt.Printf("Request details: {clusterName: %s, nodegroupName: %s, desiredSize: %d, minSize: %d, maxSize: %d}\n", clusterName, nodegroupName, desiredSize, minSize, maxSize)
-	fmt.Printf("Request sent at: %s\n", time.Now().Format(time.RFC3339))
-
+	printRequestDetails(clusterName, nodegroupName, desiredSize, minSize, maxSize, time.Now())
 	return nil
 }
 
@@ -229,9 +237,7 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, clusterName string) error {
 		return err
 	}
 
-	fmt.Printf("Request details: {clusterName: %s, nodegroupName: %s, desiredSize: %d, minSize: %d, maxSize: %d}\n", clusterName, nodegroupName, desiredSize, minSize, maxSize)
-	fmt.Printf("Request sent at: %s\n", result.Update.CreatedAt.Format(time.RFC3339))
-
+	printRequestDetails(clusterName, nodegroupName, desiredSize, minSize, maxSize, *result.Update.CreatedAt)
 	return nil
 }
 
