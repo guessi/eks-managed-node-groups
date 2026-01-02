@@ -131,9 +131,20 @@ func nodegroupSizeForm() (int32, int32, int32, error) {
 		return 0, 0, 0, err
 	}
 
-	desired, _ := utils.ParseInt32(desiredSize)
-	min, _ := utils.ParseInt32(minSize)
-	max, _ := utils.ParseInt32(maxSize)
+	desired, err := utils.ParseInt32(desiredSize)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid desired size: %w", err)
+	}
+
+	min, err := utils.ParseInt32(minSize)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid min size: %w", err)
+	}
+
+	max, err := utils.ParseInt32(maxSize)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid max size: %w", err)
+	}
 
 	return desired, min, max, nil
 }
@@ -170,6 +181,9 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName str
 	}
 
 	group := describeAutoScalingGroupsOutput.AutoScalingGroups[0]
+	if group.DesiredCapacity == nil || group.MinSize == nil || group.MaxSize == nil {
+		return fmt.Errorf("auto scaling group %s has nil capacity values", nodegroupName)
+	}
 	currentDesiredCapacity := *group.DesiredCapacity
 	currentMinSize := *group.MinSize
 	currentMaxSize := *group.MaxSize
@@ -221,6 +235,9 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, clusterName string) error {
 	if err != nil {
 		return err
 	}
+	if scalingConfig.DesiredSize == nil || scalingConfig.MinSize == nil || scalingConfig.MaxSize == nil {
+		return fmt.Errorf("nodegroup %s has nil scaling config values", nodegroupName)
+	}
 	if *scalingConfig.DesiredSize == desiredSize && *scalingConfig.MinSize == minSize && *scalingConfig.MaxSize == maxSize {
 		fmt.Println("no change required, target node group size have no difference")
 		return nil
@@ -235,6 +252,9 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, clusterName string) error {
 	result, err := ekswrapper.UpdateNodegroupConfig(eksClient, updateNodegroupConfigInput)
 	if err != nil {
 		return err
+	}
+	if result.Update == nil || result.Update.CreatedAt == nil {
+		return fmt.Errorf("invalid update response for nodegroup %s", nodegroupName)
 	}
 
 	printRequestDetails(clusterName, nodegroupName, desiredSize, minSize, maxSize, *result.Update.CreatedAt)

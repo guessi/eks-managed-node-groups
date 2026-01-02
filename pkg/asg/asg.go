@@ -33,6 +33,24 @@ func GetAsgClient(region string) (*autoscaling.Client, error) {
 	}), nil
 }
 
+func isManagedNodeGroup(group types.AutoScalingGroup, clusterName string) bool {
+	hasClusterTag := false
+	hasNodegroupTag := false
+
+	for _, tag := range group.Tags {
+		if tag.Key != nil && tag.Value != nil {
+			if *tag.Key == "eks:cluster-name" && *tag.Value == clusterName {
+				hasClusterTag = true
+			}
+			if *tag.Key == "eks:nodegroup-name" {
+				hasNodegroupTag = true
+			}
+		}
+	}
+
+	return hasClusterTag && hasNodegroupTag
+}
+
 func GetAutoScalingGroupsByClusterName(client *autoscaling.Client, clusterName string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -50,14 +68,10 @@ func GetAutoScalingGroupsByClusterName(client *autoscaling.Client, clusterName s
 
 	autoscalinggroups := []string{}
 	for _, group := range result.AutoScalingGroups {
-		var isManagedNodeGroup bool
-		for _, tag := range group.Tags {
-			if *tag.Key == "eks:cluster-name" && *tag.Value == clusterName {
-				isManagedNodeGroup = true
-				break
-			}
+		if group.AutoScalingGroupName == nil {
+			continue
 		}
-		if !isManagedNodeGroup {
+		if !isManagedNodeGroup(group, clusterName) {
 			autoscalinggroups = append(autoscalinggroups, *group.AutoScalingGroupName)
 		}
 	}
