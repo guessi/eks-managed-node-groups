@@ -12,6 +12,18 @@ import (
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
 )
 
+func ValidateCredentials(region string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+	if err != nil {
+		return fmt.Errorf("unable to load AWS config: %w", err)
+	}
+
+	return nil
+}
+
 func GetEksClient(region string) (*eks.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

@@ -262,6 +262,10 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, clusterName string) error {
 }
 
 func Entry(region string) error {
+	if err := ekswrapper.ValidateCredentials(region); err != nil {
+		return fmt.Errorf("credential validation failed: %w", err)
+	}
+
 	eksClient, err := ekswrapper.GetEksClient(region)
 	if err != nil {
 		return err
