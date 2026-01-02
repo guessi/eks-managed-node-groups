@@ -1,5 +1,12 @@
 <!-- markdownlint-disable -->
 
+# v1.3.0 / 2026-01-02
+
+* Add AWS credential validation
+* Improve node group input validations
+* Bump dependencies
+* Bump actions/stale@v10
+
 # v1.2.0 / 2025-11-29
 
 * Context timeout support
