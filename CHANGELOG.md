@@ -1,5 +1,9 @@
 <!-- markdownlint-disable -->
 
+# v1.5.0 / 2026-05-14
+
+* Bump dependencies
+
 # v1.4.0 / 2026-02-07
 
 * Bump dependencies
