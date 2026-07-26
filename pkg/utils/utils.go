@@ -39,6 +39,8 @@ func ValidateNodegroupSize(desiredSize, minSize, maxSize int32) error {
 		return fmt.Errorf("minimum capacity %d can't be greater than desired size %d", minSize, desiredSize)
 	case minSize > maxSize:
 		return fmt.Errorf("minimum capacity %d can't be greater than max size %d", minSize, maxSize)
+	case desiredSize > maxSize:
+		return fmt.Errorf("desired size %d can't be greater than max size %d", desiredSize, maxSize)
 	}
 	return nil
 }
