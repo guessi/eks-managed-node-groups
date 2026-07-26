@@ -26,6 +26,7 @@ type Options struct {
 	DesiredSize   *int32
 	MinSize       *int32
 	MaxSize       *int32
+	Yes           bool
 }
 
 var regionPattern = regexp.MustCompile(`^[a-z0-9-]+$`)
@@ -52,6 +53,13 @@ func (o Options) Validate() error {
 	return nil
 }
 
+// scalingConfigDrifted reports whether the latest size values no longer match
+// the baseline values shown to the user before confirmation
+func scalingConfigDrifted(baseDesired, baseMin, baseMax int32, latestDesired, latestMin, latestMax *int32) bool {
+	return latestDesired == nil || latestMin == nil || latestMax == nil ||
+		*latestDesired != baseDesired || *latestMin != baseMin || *latestMax != baseMax
+}
+
 func ShowVersion() {
 	r, _ := regexp.Compile(`v[0-9]\.[0-9]+\.[0-9]+`)
 	versionInfo := r.FindString(constants.GitVersion)
@@ -69,6 +77,29 @@ func printRequestDetails(clusterName, nodegroupName string, desiredSize, minSize
 	fmt.Printf("  Min Size:     %d\n", minSize)
 	fmt.Printf("  Max Size:     %d\n", maxSize)
 	fmt.Printf("  Sent At:      %s\n", sentAt.Format(time.RFC3339))
+}
+
+func printSizeChange(clusterName, nodegroupName string, currentDesired, currentMin, currentMax, desiredSize, minSize, maxSize int32) {
+	fmt.Printf("  Cluster:      %s\n", clusterName)
+	fmt.Printf("  Node Group:   %s\n", nodegroupName)
+	fmt.Printf("  Desired Size: %d -> %d\n", currentDesired, desiredSize)
+	fmt.Printf("  Min Size:     %d -> %d\n", currentMin, minSize)
+	fmt.Printf("  Max Size:     %d -> %d\n", currentMax, maxSize)
+}
+
+func confirmSizeChange() (bool, error) {
+	var confirmed bool
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Apply this change?").
+				Value(&confirmed),
+		),
+	)
+	if err := form.Run(); err != nil {
+		return false, fmt.Errorf("confirmation form error: %w", err)
+	}
+	return confirmed, nil
 }
 
 func clustersForm(clusters []string) (string, error) {
@@ -257,6 +288,33 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, opts Options) e
 		return nil
 	}
 
+	if !opts.Yes {
+		fmt.Println("About to apply:")
+		printSizeChange(clusterName, nodegroupName, currentDesiredCapacity, currentMinSize, currentMaxSize, desiredSize, minSize, maxSize)
+		confirmed, err := confirmSizeChange()
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			fmt.Println("aborted, no change applied")
+			return nil
+		}
+
+		// the auto scaling group may have been modified while waiting for
+		// confirmation, re-read and make sure it still matches what was shown
+		latestOutput, err := asgwrapper.DescribeAutoScalingGroupsByNodegroupName(asgClient, nodegroupName)
+		if err != nil {
+			return err
+		}
+		if len(latestOutput.AutoScalingGroups) == 0 {
+			return fmt.Errorf("auto scaling group %s not found", nodegroupName)
+		}
+		latest := latestOutput.AutoScalingGroups[0]
+		if scalingConfigDrifted(currentDesiredCapacity, currentMinSize, currentMaxSize, latest.DesiredCapacity, latest.MinSize, latest.MaxSize) {
+			return fmt.Errorf("auto scaling group %s was modified while waiting for confirmation, please re-run", nodegroupName)
+		}
+	}
+
 	updateAutoScalingGroupInput := autoscaling.UpdateAutoScalingGroupInput{
 		AutoScalingGroupName: &nodegroupName,
 		DesiredCapacity:      &desiredSize,
@@ -303,6 +361,29 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, opts Options) error {
 	if *scalingConfig.DesiredSize == desiredSize && *scalingConfig.MinSize == minSize && *scalingConfig.MaxSize == maxSize {
 		fmt.Println("no change required, target node group size have no difference")
 		return nil
+	}
+
+	if !opts.Yes {
+		fmt.Println("About to apply:")
+		printSizeChange(clusterName, nodegroupName, *scalingConfig.DesiredSize, *scalingConfig.MinSize, *scalingConfig.MaxSize, desiredSize, minSize, maxSize)
+		confirmed, err := confirmSizeChange()
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			fmt.Println("aborted, no change applied")
+			return nil
+		}
+
+		// the nodegroup may have been modified while waiting for confirmation,
+		// re-read and make sure it still matches what was shown
+		latest, err := ekswrapper.GetNodegroupScalingConfig(eksClient, clusterName, nodegroupName)
+		if err != nil {
+			return err
+		}
+		if scalingConfigDrifted(*scalingConfig.DesiredSize, *scalingConfig.MinSize, *scalingConfig.MaxSize, latest.DesiredSize, latest.MinSize, latest.MaxSize) {
+			return fmt.Errorf("nodegroup %s was modified while waiting for confirmation, please re-run", nodegroupName)
+		}
 	}
 
 	updateNodegroupConfigInput := eks.UpdateNodegroupConfigInput{

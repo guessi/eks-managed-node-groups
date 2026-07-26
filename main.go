@@ -57,6 +57,11 @@ func main() {
 				Usage:       "Max size of the node group (requires --desired and --min)",
 				DefaultText: "interactive",
 			},
+			&cli.BoolFlag{
+				Name:    "yes",
+				Aliases: []string{"y"},
+				Usage:   "Apply without the confirmation prompt",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			opts := ui.Options{
@@ -65,6 +70,7 @@ func main() {
 				ClusterName:   c.String("cluster"),
 				NodeGroupType: c.String("type"),
 				NodegroupName: c.String("nodegroup"),
+				Yes:           c.Bool("yes"),
 			}
 
 			if c.IsSet("desired") {

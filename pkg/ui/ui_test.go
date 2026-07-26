@@ -66,3 +66,28 @@ func TestResolveNodegroupSize(t *testing.T) {
 		}
 	})
 }
+
+func TestScalingConfigDrifted(t *testing.T) {
+	tests := []struct {
+		name                                string
+		latestDesired, latestMin, latestMax *int32
+		want                                bool
+	}{
+		{"no drift when values match", i32(1), i32(0), i32(5), false},
+		{"drift on desired change", i32(2), i32(0), i32(5), true},
+		{"drift on min change", i32(1), i32(1), i32(5), true},
+		{"drift on max change", i32(1), i32(0), i32(4), true},
+		{"drift on nil desired", nil, i32(0), i32(5), true},
+		{"drift on nil min", i32(1), nil, i32(5), true},
+		{"drift on nil max", i32(1), i32(0), nil, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := scalingConfigDrifted(1, 0, 5, tt.latestDesired, tt.latestMin, tt.latestMax)
+			if got != tt.want {
+				t.Errorf("scalingConfigDrifted() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
