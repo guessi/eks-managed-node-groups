@@ -22,7 +22,13 @@ func ValidateCredentials(region string) error {
 		return fmt.Errorf("unable to load AWS config: %w", err)
 	}
 
-	if _, err := sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{}); err != nil {
+	stsClient := sts.NewFromConfig(cfg, func(options *sts.Options) {
+		options.APIOptions = append(
+			options.APIOptions,
+			middleware.AddUserAgentKeyValue(constants.AppName, constants.GitVersion),
+		)
+	})
+	if _, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{}); err != nil {
 		return fmt.Errorf("unable to verify AWS credentials: %w", err)
 	}
 
