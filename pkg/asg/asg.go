@@ -52,27 +52,30 @@ func isManagedNodeGroup(group types.AutoScalingGroup, clusterName string) bool {
 }
 
 func GetAutoScalingGroupsByClusterName(client *autoscaling.Client, clusterName string) ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	result, err := client.DescribeAutoScalingGroups(ctx, &autoscaling.DescribeAutoScalingGroupsInput{
+	paginator := autoscaling.NewDescribeAutoScalingGroupsPaginator(client, &autoscaling.DescribeAutoScalingGroupsInput{
 		Filters: []types.Filter{
 			{
 				Name:   aws.String(fmt.Sprintf("tag:kubernetes.io/cluster/%s", clusterName)),
 				Values: []string{"owned"},
 			},
 		}})
-	if err != nil {
-		return nil, fmt.Errorf("unable to execute DescribeAutoScalingGroups: %w", err)
-	}
 
 	autoscalinggroups := []string{}
-	for _, group := range result.AutoScalingGroups {
-		if group.AutoScalingGroupName == nil {
-			continue
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to execute DescribeAutoScalingGroups: %w", err)
 		}
-		if !isManagedNodeGroup(group, clusterName) {
-			autoscalinggroups = append(autoscalinggroups, *group.AutoScalingGroupName)
+		for _, group := range page.AutoScalingGroups {
+			if group.AutoScalingGroupName == nil {
+				continue
+			}
+			if !isManagedNodeGroup(group, clusterName) {
+				autoscalinggroups = append(autoscalinggroups, *group.AutoScalingGroupName)
+			}
 		}
 	}
 	return autoscalinggroups, nil

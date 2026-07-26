@@ -45,25 +45,35 @@ func GetEksClient(region string) (*eks.Client, error) {
 }
 
 func ListClusters(client *eks.Client) ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	result, err := client.ListClusters(ctx, &eks.ListClustersInput{})
-	if err != nil {
-		return nil, fmt.Errorf("unable to execute ListClusters: %w", err)
+	var clusters []string
+	paginator := eks.NewListClustersPaginator(client, &eks.ListClustersInput{})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to execute ListClusters: %w", err)
+		}
+		clusters = append(clusters, page.Clusters...)
 	}
-	return result.Clusters, nil
+	return clusters, nil
 }
 
 func ListNodegroups(client *eks.Client, cluster string) ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	result, err := client.ListNodegroups(ctx, &eks.ListNodegroupsInput{ClusterName: &cluster})
-	if err != nil {
-		return nil, fmt.Errorf("unable to execute ListNodegroups: %w", err)
+	var nodegroups []string
+	paginator := eks.NewListNodegroupsPaginator(client, &eks.ListNodegroupsInput{ClusterName: &cluster})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to execute ListNodegroups: %w", err)
+		}
+		nodegroups = append(nodegroups, page.Nodegroups...)
 	}
-	return result.Nodegroups, nil
+	return nodegroups, nil
 }
 
 func GetNodegroupScalingConfig(client *eks.Client, clusterName, nodegroupName string) (*types.NodegroupScalingConfig, error) {
