@@ -22,6 +22,7 @@ In the real world, not all [Amazon EKS](https://docs.aws.amazon.com/eks/latest/u
     * [eks:ListClusters](https://docs.aws.amazon.com/eks/latest/APIReference/API_ListClusters.html)
     * [eks:ListNodegroups](https://docs.aws.amazon.com/eks/latest/APIReference/API_ListNodegroups.html)
     * [eks:UpdateNodegroupConfig](https://docs.aws.amazon.com/eks/latest/APIReference/API_UpdateNodegroupConfig.html)
+* Network access to the [AWS STS endpoint](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_sts.html), credentials are verified with `sts:GetCallerIdentity` on startup (allowed by default, no extra IAM permission required).
 
 ## 🚀 Quick start
 
@@ -29,6 +30,52 @@ In the real world, not all [Amazon EKS](https://docs.aws.amazon.com/eks/latest/u
 ![image](https://github.com/user-attachments/assets/8e324eac-2f0a-4a42-a7a9-2e9140ac7ff6)
 ![image](https://github.com/user-attachments/assets/2839e7f4-bba3-4273-99bd-54041f4c7451)
 ![image](https://github.com/user-attachments/assets/9e3f2d12-c697-4f61-80f2-5b9468ac25a0)
+
+## 🎛️ Usage
+
+Run without any flag to walk through the interactive menus, or pass flags to skip the corresponding steps:
+
+| Flag                        | Description                                    |
+| --------------------------- | ---------------------------------------------- |
+| `--region`, `-r`            | Region for the clusters (default: `us-east-1`) |
+| `--profile`, `-p`           | AWS shared config profile to use               |
+| `--cluster`, `-c`           | Cluster name (skip interactive selection)      |
+| `--type`, `-t`              | Node group type: `managed` or `self-managed`   |
+| `--nodegroup`, `-n`         | Node group name (skip interactive selection)   |
+| `--desired`/`--min`/`--max` | Node group sizes, must be set together         |
+| `--dry-run`                 | Preview the change without applying it         |
+| `--yes`, `-y`               | Apply without the confirmation prompt          |
+| `--output`, `-o`            | Output format: `text` or `json`                |
+
+Each flag independently skips its own step, any step without a flag falls back to the interactive menu.
+
+`--output json` is intended for fully non-interactive runs, pass all the flags (or `--dry-run`) so no interactive menu mixes into the piped output. Change previews and apply results are emitted as a full report object, other outcomes (nothing to change, aborted, nothing found) are emitted as `{"message": ..., "applied": false}`, check the `applied` field to tell them apart.
+
+Shell completion is available via the built-in `completion` command:
+
+```bash
+eks-managed-node-groups completion zsh
+```
+
+### Examples
+
+Fully non-interactive, preview the change first:
+
+```bash
+eks-managed-node-groups \
+  --region us-east-1 \
+  --profile myprofile \
+  --cluster my-cluster \
+  --type managed \
+  --nodegroup my-nodegroup \
+  --desired 3 \
+  --min 1 \
+  --max 5 \
+  --dry-run
+```
+
+Hint: You may drop `--dry-run` and pass `--yes` to apply without prompting.
+
 
 ## 👷 Install
 
