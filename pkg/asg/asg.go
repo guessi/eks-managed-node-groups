@@ -13,14 +13,18 @@ import (
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
 )
 
-func GetAsgClient(region string) (*autoscaling.Client, error) {
+func GetAsgClient(region, profile string) (*autoscaling.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cfg, err := config.LoadDefaultConfig(
-		ctx,
+	optFns := []func(*config.LoadOptions) error{
 		config.WithRegion(region),
-	)
+	}
+	if profile != "" {
+		optFns = append(optFns, config.WithSharedConfigProfile(profile))
+	}
+
+	cfg, err := config.LoadDefaultConfig(ctx, optFns...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load AWS SDK config: %w", err)
 	}

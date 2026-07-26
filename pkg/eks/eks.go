@@ -13,11 +13,21 @@ import (
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
 )
 
-func ValidateCredentials(region string) error {
+func loadConfigOptions(region, profile string) []func(*config.LoadOptions) error {
+	optFns := []func(*config.LoadOptions) error{
+		config.WithRegion(region),
+	}
+	if profile != "" {
+		optFns = append(optFns, config.WithSharedConfigProfile(profile))
+	}
+	return optFns
+}
+
+func ValidateCredentials(region, profile string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+	cfg, err := config.LoadDefaultConfig(ctx, loadConfigOptions(region, profile)...)
 	if err != nil {
 		return fmt.Errorf("unable to load AWS config: %w", err)
 	}
@@ -35,14 +45,11 @@ func ValidateCredentials(region string) error {
 	return nil
 }
 
-func GetEksClient(region string) (*eks.Client, error) {
+func GetEksClient(region, profile string) (*eks.Client, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cfg, err := config.LoadDefaultConfig(
-		ctx,
-		config.WithRegion(region),
-	)
+	cfg, err := config.LoadDefaultConfig(ctx, loadConfigOptions(region, profile)...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load AWS SDK config: %w", err)
 	}

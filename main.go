@@ -22,13 +22,69 @@ func main() {
 				Value:   "us-east-1",
 				Usage:   "Region for the clusters",
 			},
+			&cli.StringFlag{
+				Name:    "profile",
+				Aliases: []string{"p"},
+				Usage:   "AWS shared config profile to use",
+			},
+			&cli.StringFlag{
+				Name:    "cluster",
+				Aliases: []string{"c"},
+				Usage:   "Cluster name (skip interactive cluster selection)",
+			},
+			&cli.StringFlag{
+				Name:    "type",
+				Aliases: []string{"t"},
+				Usage:   "Node group type, one of: managed, self-managed (skip interactive type selection)",
+			},
+			&cli.StringFlag{
+				Name:    "nodegroup",
+				Aliases: []string{"n"},
+				Usage:   "Node group name (skip interactive nodegroup selection)",
+			},
+			&cli.Int32Flag{
+				Name:        "desired",
+				Usage:       "Desired size of the node group (requires --min and --max)",
+				DefaultText: "interactive",
+			},
+			&cli.Int32Flag{
+				Name:        "min",
+				Usage:       "Min size of the node group (requires --desired and --max)",
+				DefaultText: "interactive",
+			},
+			&cli.Int32Flag{
+				Name:        "max",
+				Usage:       "Max size of the node group (requires --desired and --min)",
+				DefaultText: "interactive",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			region := c.String("region")
-			if err := ui.Entry(region); err != nil {
+			opts := ui.Options{
+				Region:        c.String("region"),
+				Profile:       c.String("profile"),
+				ClusterName:   c.String("cluster"),
+				NodeGroupType: c.String("type"),
+				NodegroupName: c.String("nodegroup"),
+			}
+
+			if c.IsSet("desired") {
+				v := c.Int32("desired")
+				opts.DesiredSize = &v
+			}
+			if c.IsSet("min") {
+				v := c.Int32("min")
+				opts.MinSize = &v
+			}
+			if c.IsSet("max") {
+				v := c.Int32("max")
+				opts.MaxSize = &v
+			}
+
+			if err := opts.Validate(); err != nil {
 				return err
 			}
-			return nil
+
+			return ui.Entry(opts)
 		},
 		Commands: []*cli.Command{
 			{

@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
@@ -14,6 +16,41 @@ import (
 	ekswrapper "github.com/guessi/eks-managed-node-groups/pkg/eks"
 	"github.com/guessi/eks-managed-node-groups/pkg/utils"
 )
+
+type Options struct {
+	Region        string
+	Profile       string
+	ClusterName   string
+	NodeGroupType string // "", "managed" or "self-managed"
+	NodegroupName string
+	DesiredSize   *int32
+	MinSize       *int32
+	MaxSize       *int32
+}
+
+var regionPattern = regexp.MustCompile(`^[a-z0-9-]+$`)
+
+func (o Options) Validate() error {
+	if o.Region != "" && !regionPattern.MatchString(o.Region) {
+		return fmt.Errorf("invalid --region %q, must match %q", o.Region, regionPattern.String())
+	}
+
+	if o.NodeGroupType != "" && o.NodeGroupType != "managed" && o.NodeGroupType != "self-managed" {
+		return fmt.Errorf("invalid --type %q, must be one of: managed, self-managed", o.NodeGroupType)
+	}
+
+	sizesSet := 0
+	for _, size := range []*int32{o.DesiredSize, o.MinSize, o.MaxSize} {
+		if size != nil {
+			sizesSet++
+		}
+	}
+	if sizesSet != 0 && sizesSet != 3 {
+		return errors.New("--desired, --min and --max must be provided together")
+	}
+
+	return nil
+}
 
 func ShowVersion() {
 	r, _ := regexp.Compile(`v[0-9]\.[0-9]+\.[0-9]+`)
@@ -149,7 +186,37 @@ func nodegroupSizeForm() (int32, int32, int32, error) {
 	return desired, min, max, nil
 }
 
-func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName string) error {
+func resolveNodegroupName(opts Options, nodegroups []string) (string, error) {
+	if opts.NodegroupName != "" {
+		if !slices.Contains(nodegroups, opts.NodegroupName) {
+			return "", fmt.Errorf("nodegroup %q not found in cluster %q", opts.NodegroupName, opts.ClusterName)
+		}
+		return opts.NodegroupName, nil
+	}
+	return nodegroupsForm(nodegroups)
+}
+
+func resolveNodegroupSize(opts Options) (int32, int32, int32, error) {
+	var desiredSize, minSize, maxSize int32
+	var err error
+
+	if opts.DesiredSize != nil && opts.MinSize != nil && opts.MaxSize != nil {
+		desiredSize, minSize, maxSize = *opts.DesiredSize, *opts.MinSize, *opts.MaxSize
+	} else {
+		desiredSize, minSize, maxSize, err = nodegroupSizeForm()
+		if err != nil {
+			return 0, 0, 0, err
+		}
+	}
+
+	if err := utils.ValidateNodegroupSize(desiredSize, minSize, maxSize); err != nil {
+		return 0, 0, 0, err
+	}
+	return desiredSize, minSize, maxSize, nil
+}
+
+func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, opts Options) error {
+	clusterName := opts.ClusterName
 	nodegroups, err := asgwrapper.GetAutoScalingGroupsByClusterName(asgClient, clusterName)
 	if err != nil {
 		return err
@@ -158,16 +225,13 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName str
 		fmt.Println("no nodegroup found")
 		return nil
 	}
-	nodegroupName, err := nodegroupsForm(nodegroups)
+	nodegroupName, err := resolveNodegroupName(opts, nodegroups)
 	if err != nil {
 		return err
 	}
 
-	desiredSize, minSize, maxSize, err := nodegroupSizeForm()
+	desiredSize, minSize, maxSize, err := resolveNodegroupSize(opts)
 	if err != nil {
-		return err
-	}
-	if err := utils.ValidateNodegroupSize(desiredSize, minSize, maxSize); err != nil {
 		return err
 	}
 
@@ -209,7 +273,8 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, clusterName str
 	return nil
 }
 
-func managedNodeGroupWorkflow(eksClient *eks.Client, clusterName string) error {
+func managedNodeGroupWorkflow(eksClient *eks.Client, opts Options) error {
+	clusterName := opts.ClusterName
 	nodegroups, err := ekswrapper.ListNodegroups(eksClient, clusterName)
 	if err != nil {
 		return err
@@ -218,16 +283,13 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, clusterName string) error {
 		fmt.Println("no nodegroup found")
 		return nil
 	}
-	nodegroupName, err := nodegroupsForm(nodegroups)
+	nodegroupName, err := resolveNodegroupName(opts, nodegroups)
 	if err != nil {
 		return err
 	}
 
-	desiredSize, minSize, maxSize, err := nodegroupSizeForm()
+	desiredSize, minSize, maxSize, err := resolveNodegroupSize(opts)
 	if err != nil {
-		return err
-	}
-	if err := utils.ValidateNodegroupSize(desiredSize, minSize, maxSize); err != nil {
 		return err
 	}
 
@@ -261,45 +323,71 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, clusterName string) error {
 	return nil
 }
 
-func Entry(region string) error {
-	if err := ekswrapper.ValidateCredentials(region); err != nil {
+func Entry(opts Options) error {
+	if err := opts.Validate(); err != nil {
+		return err
+	}
+
+	if err := ekswrapper.ValidateCredentials(opts.Region, opts.Profile); err != nil {
 		return fmt.Errorf("credential validation failed: %w", err)
 	}
 
-	eksClient, err := ekswrapper.GetEksClient(region)
-	if err != nil {
-		return err
-	}
+	var eksClient *eks.Client
+	var err error
 
-	clusters, err := ekswrapper.ListClusters(eksClient)
-	if err != nil {
-		return err
-	}
-	if len(clusters) == 0 {
-		fmt.Println("no cluster found")
-		return nil
-	}
-	clusterName, err := clustersForm(clusters)
-	if err != nil {
-		return err
-	}
-
-	nodeGroupType, err := nodeGroupTypeForm()
-	if err != nil {
-		return err
-	}
-
-	if nodeGroupType == constants.NodeGroupTypes[constants.SelfManaged] {
-		asgClient, err := asgwrapper.GetAsgClient(region)
+	// self-managed node groups with an explicit cluster name need no EKS API
+	// access, the cluster tag filter on auto scaling groups does the scoping
+	if opts.NodeGroupType != "self-managed" || opts.ClusterName == "" {
+		eksClient, err = ekswrapper.GetEksClient(opts.Region, opts.Profile)
 		if err != nil {
 			return err
 		}
 
-		if err := selfManagedNodeGroupWorkflow(asgClient, clusterName); err != nil {
+		clusters, err := ekswrapper.ListClusters(eksClient)
+		if err != nil {
+			return err
+		}
+		if len(clusters) == 0 {
+			fmt.Println("no cluster found")
+			return nil
+		}
+
+		if opts.ClusterName != "" {
+			if !slices.Contains(clusters, opts.ClusterName) {
+				return fmt.Errorf("cluster %q not found in region %q", opts.ClusterName, opts.Region)
+			}
+		} else {
+			opts.ClusterName, err = clustersForm(clusters)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	var nodeGroupType string
+	switch opts.NodeGroupType {
+	case "managed":
+		nodeGroupType = constants.NodeGroupTypes[constants.Managed]
+	case "self-managed":
+		nodeGroupType = constants.NodeGroupTypes[constants.SelfManaged]
+	default:
+		nodeGroupType, err = nodeGroupTypeForm()
+		if err != nil {
+			return err
+		}
+	}
+
+	if nodeGroupType == constants.NodeGroupTypes[constants.SelfManaged] {
+		asgClient, err := asgwrapper.GetAsgClient(opts.Region, opts.Profile)
+		if err != nil {
+			return err
+		}
+
+		if err := selfManagedNodeGroupWorkflow(asgClient, opts); err != nil {
 			return err
 		}
 	} else {
-		if err := managedNodeGroupWorkflow(eksClient, clusterName); err != nil {
+		if err := managedNodeGroupWorkflow(eksClient, opts); err != nil {
 			return err
 		}
 	}
