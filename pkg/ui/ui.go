@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -26,7 +27,9 @@ type Options struct {
 	DesiredSize   *int32
 	MinSize       *int32
 	MaxSize       *int32
+	DryRun        bool
 	Yes           bool
+	Output        string // "text" or "json"
 }
 
 var regionPattern = regexp.MustCompile(`^[a-z0-9-]+$`)
@@ -40,6 +43,10 @@ func (o Options) Validate() error {
 		return fmt.Errorf("invalid --type %q, must be one of: managed, self-managed", o.NodeGroupType)
 	}
 
+	if o.Output != "" && o.Output != "text" && o.Output != "json" {
+		return fmt.Errorf("invalid --output %q, must be one of: text, json", o.Output)
+	}
+
 	sizesSet := 0
 	for _, size := range []*int32{o.DesiredSize, o.MinSize, o.MaxSize} {
 		if size != nil {
@@ -50,6 +57,39 @@ func (o Options) Validate() error {
 		return errors.New("--desired, --min and --max must be provided together")
 	}
 
+	return nil
+}
+
+type changeReport struct {
+	Cluster        string `json:"cluster"`
+	Nodegroup      string `json:"nodegroup"`
+	CurrentDesired int32  `json:"currentDesiredSize"`
+	CurrentMin     int32  `json:"currentMinSize"`
+	CurrentMax     int32  `json:"currentMaxSize"`
+	DesiredSize    int32  `json:"desiredSize"`
+	MinSize        int32  `json:"minSize"`
+	MaxSize        int32  `json:"maxSize"`
+	Applied        bool   `json:"applied"`
+	SentAt         string `json:"sentAt,omitempty"`
+}
+
+func printJSON(v any) error {
+	out, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return fmt.Errorf("unable to marshal output: %w", err)
+	}
+	fmt.Println(string(out))
+	return nil
+}
+
+func printStatus(opts Options, message string) error {
+	if opts.Output == "json" {
+		return printJSON(struct {
+			Message string `json:"message"`
+			Applied bool   `json:"applied"`
+		}{message, false})
+	}
+	fmt.Println(message)
 	return nil
 }
 
@@ -100,6 +140,35 @@ func confirmSizeChange() (bool, error) {
 		return false, fmt.Errorf("confirmation form error: %w", err)
 	}
 	return confirmed, nil
+}
+
+func reportChange(opts Options, nodegroupName string, currentDesired, currentMin, currentMax, desiredSize, minSize, maxSize int32, applied bool, sentAt time.Time) error {
+	sentAt = sentAt.UTC()
+	if opts.Output == "json" {
+		report := changeReport{
+			Cluster:        opts.ClusterName,
+			Nodegroup:      nodegroupName,
+			CurrentDesired: currentDesired,
+			CurrentMin:     currentMin,
+			CurrentMax:     currentMax,
+			DesiredSize:    desiredSize,
+			MinSize:        minSize,
+			MaxSize:        maxSize,
+			Applied:        applied,
+		}
+		if applied {
+			report.SentAt = sentAt.Format(time.RFC3339)
+		}
+		return printJSON(report)
+	}
+
+	if applied {
+		printRequestDetails(opts.ClusterName, nodegroupName, desiredSize, minSize, maxSize, sentAt)
+	} else {
+		fmt.Println("Dry run, no change applied:")
+		printSizeChange(opts.ClusterName, nodegroupName, currentDesired, currentMin, currentMax, desiredSize, minSize, maxSize)
+	}
+	return nil
 }
 
 func clustersForm(clusters []string) (string, error) {
@@ -253,8 +322,7 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, opts Options) e
 		return err
 	}
 	if len(nodegroups) == 0 {
-		fmt.Println("no nodegroup found")
-		return nil
+		return printStatus(opts, "no nodegroup found")
 	}
 	nodegroupName, err := resolveNodegroupName(opts, nodegroups)
 	if err != nil {
@@ -284,8 +352,11 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, opts Options) e
 	currentMaxSize := *group.MaxSize
 
 	if currentDesiredCapacity == desiredSize && currentMinSize == minSize && currentMaxSize == maxSize {
-		fmt.Println("no change required, target node group size have no difference")
-		return nil
+		return printStatus(opts, "no change required, target node group size have no difference")
+	}
+
+	if opts.DryRun {
+		return reportChange(opts, nodegroupName, currentDesiredCapacity, currentMinSize, currentMaxSize, desiredSize, minSize, maxSize, false, time.Time{})
 	}
 
 	if !opts.Yes {
@@ -296,8 +367,7 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, opts Options) e
 			return err
 		}
 		if !confirmed {
-			fmt.Println("aborted, no change applied")
-			return nil
+			return printStatus(opts, "aborted, no change applied")
 		}
 
 		// the auto scaling group may have been modified while waiting for
@@ -327,8 +397,7 @@ func selfManagedNodeGroupWorkflow(asgClient *autoscaling.Client, opts Options) e
 		return err
 	}
 
-	printRequestDetails(clusterName, nodegroupName, desiredSize, minSize, maxSize, time.Now())
-	return nil
+	return reportChange(opts, nodegroupName, currentDesiredCapacity, currentMinSize, currentMaxSize, desiredSize, minSize, maxSize, true, time.Now())
 }
 
 func managedNodeGroupWorkflow(eksClient *eks.Client, opts Options) error {
@@ -338,8 +407,7 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, opts Options) error {
 		return err
 	}
 	if len(nodegroups) == 0 {
-		fmt.Println("no nodegroup found")
-		return nil
+		return printStatus(opts, "no nodegroup found")
 	}
 	nodegroupName, err := resolveNodegroupName(opts, nodegroups)
 	if err != nil {
@@ -359,8 +427,11 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, opts Options) error {
 		return fmt.Errorf("nodegroup %s has nil scaling config values", nodegroupName)
 	}
 	if *scalingConfig.DesiredSize == desiredSize && *scalingConfig.MinSize == minSize && *scalingConfig.MaxSize == maxSize {
-		fmt.Println("no change required, target node group size have no difference")
-		return nil
+		return printStatus(opts, "no change required, target node group size have no difference")
+	}
+
+	if opts.DryRun {
+		return reportChange(opts, nodegroupName, *scalingConfig.DesiredSize, *scalingConfig.MinSize, *scalingConfig.MaxSize, desiredSize, minSize, maxSize, false, time.Time{})
 	}
 
 	if !opts.Yes {
@@ -371,8 +442,7 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, opts Options) error {
 			return err
 		}
 		if !confirmed {
-			fmt.Println("aborted, no change applied")
-			return nil
+			return printStatus(opts, "aborted, no change applied")
 		}
 
 		// the nodegroup may have been modified while waiting for confirmation,
@@ -400,8 +470,7 @@ func managedNodeGroupWorkflow(eksClient *eks.Client, opts Options) error {
 		return fmt.Errorf("invalid update response for nodegroup %s", nodegroupName)
 	}
 
-	printRequestDetails(clusterName, nodegroupName, desiredSize, minSize, maxSize, *result.Update.CreatedAt)
-	return nil
+	return reportChange(opts, nodegroupName, *scalingConfig.DesiredSize, *scalingConfig.MinSize, *scalingConfig.MaxSize, desiredSize, minSize, maxSize, true, *result.Update.CreatedAt)
 }
 
 func Entry(opts Options) error {
@@ -429,8 +498,7 @@ func Entry(opts Options) error {
 			return err
 		}
 		if len(clusters) == 0 {
-			fmt.Println("no cluster found")
-			return nil
+			return printStatus(opts, "no cluster found")
 		}
 
 		if opts.ClusterName != "" {

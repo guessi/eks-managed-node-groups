@@ -58,9 +58,19 @@ func main() {
 				DefaultText: "interactive",
 			},
 			&cli.BoolFlag{
+				Name:  "dry-run",
+				Usage: "Preview the change without applying it",
+			},
+			&cli.BoolFlag{
 				Name:    "yes",
 				Aliases: []string{"y"},
 				Usage:   "Apply without the confirmation prompt",
+			},
+			&cli.StringFlag{
+				Name:    "output",
+				Aliases: []string{"o"},
+				Value:   "text",
+				Usage:   "Output format for dry-run and apply results: text or json",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
@@ -70,7 +80,9 @@ func main() {
 				ClusterName:   c.String("cluster"),
 				NodeGroupType: c.String("type"),
 				NodegroupName: c.String("nodegroup"),
+				DryRun:        c.Bool("dry-run"),
 				Yes:           c.Bool("yes"),
+				Output:        c.String("output"),
 			}
 
 			if c.IsSet("desired") {
