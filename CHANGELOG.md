@@ -1,5 +1,14 @@
 <!-- markdownlint-disable -->
 
+# v1.7.0 / 2026-07-26
+
+* Add command line flags for non-interactive usage (`--cluster`, `--nodegroup`, `--dry-run`, `--yes`, `--output json`, etc.)
+* Enable shell completion
+* Verify AWS credentials with STS on startup
+* Paginate EKS and Auto Scaling list operations
+* Improve error handling and input validation
+* Bump dependencies
+
 # v1.6.0 / 2026-06-04
 
 * Bump dependencies
