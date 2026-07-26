@@ -12,9 +12,10 @@ import (
 
 func main() {
 	app := &cli.Command{
-		Name:    constants.AppName,
-		Usage:   constants.AppUsage,
-		Version: constants.GitVersion,
+		Name:                  constants.AppName,
+		Usage:                 constants.AppUsage,
+		Version:               constants.GitVersion,
+		EnableShellCompletion: true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "region",
