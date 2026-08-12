@@ -8,10 +8,10 @@ import (
 	"slices"
 	"time"
 
+	"charm.land/huh/v2"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/eks/types"
-	"github.com/charmbracelet/huh"
 	asgwrapper "github.com/guessi/eks-managed-node-groups/pkg/asg"
 	"github.com/guessi/eks-managed-node-groups/pkg/constants"
 	ekswrapper "github.com/guessi/eks-managed-node-groups/pkg/eks"
