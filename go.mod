@@ -2,7 +2,7 @@ module github.com/guessi/eks-managed-node-groups
 
 go 1.26
 
-toolchain go1.26.6
+toolchain go1.26.8
 
 require (
 	charm.land/huh/v2 v2.0.3
