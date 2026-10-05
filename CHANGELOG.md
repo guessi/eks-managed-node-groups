@@ -1,5 +1,12 @@
 <!-- markdownlint-disable -->
 
+# v1.8.0 / 2026-10-05
+
+* Migrate to huh/v2
+* Built with go1.26.8
+* Bump dependencies
+* Bump actions/stale@v11
+
 # v1.7.0 / 2026-07-26
 
 * Add command line flags for non-interactive usage (`--cluster`, `--nodegroup`, `--dry-run`, `--yes`, `--output json`, etc.)
